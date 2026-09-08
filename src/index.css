@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+:root {
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --surface-alt: #f7f9fb;
+  --border: #dde3ea;
+  --border-strong: #c7d0da;
+  --text-primary: #101825;
+  --text-secondary: #5b6b7c;
+  --text-muted: #8695a4;
+  --nav-bg: #0b1c30;
+  --nav-bg-active: #14304f;
+  --nav-text: #b9c8d8;
+  --nav-text-active: #ffffff;
+  --accent: #2563eb;
+  --accent-soft: #e6edfc;
+  --healthy: #16a34a;
+  --healthy-soft: #e7f6ec;
+  --warning: #d97706;
+  --warning-soft: #fdf1e0;
+  --critical: #dc2626;
+  --critical-soft: #fbe7e7;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 13.5px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.chip-healthy { background: var(--healthy-soft); color: var(--healthy); }
+.chip-warning { background: var(--warning-soft); color: var(--warning); }
+.chip-critical { background: var(--critical-soft); color: var(--critical); }
+.chip-neutral { background: var(--surface-alt); color: var(--text-secondary); border: 1px solid var(--border); }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot-healthy { background: var(--healthy); }
+.dot-warning { background: var(--warning); }
+.dot-critical { background: var(--critical); }

@@ -1,0 +1,351 @@
+import type { SupplierNode, SupplierWithKpis, SupplyEdge } from '../models/types'
+import { deriveKpis } from '../calculations/kpi'
+
+// Conceptual, fictional multi-tier automotive supply network used to demonstrate
+// the thesis framework (Kapitel 5.2 / 5.5). All figures are simulated prototype
+// data, not real supplier records. OEM = Vantoria Motors AG (Ingolstadt, Germany).
+
+const rawSuppliers: SupplierNode[] = [
+  {
+    id: 'OEM-1', name: 'Vantoria Motors AG', tier: 'OEM', country: 'Germany', city: 'Ingolstadt',
+    component: 'OEM Assembly', capacity: 1800, capacityUtilization: 88,
+    onHandInventory: 54000, pipelineInventory: 18000, dailyConsumption: 1800,
+    leadTimeDays: 1, onTimeDelivery: 96, recoveryTimeDays: 14, altSourceActivationDays: 14,
+    financialImpactPerDay: 4500000, alternativeSupplierIds: [], spof: false,
+    attdDays: 1.2, reactionLeadTimeDays: 1.5,
+    notes: 'Final assembly plant. TTS/TTR shown for internal buffer & line-restart planning.',
+  },
+
+  // Tier-1
+  { id: 'T1-01', name: 'NovaDrive Electronics', tier: 'Tier-1', country: 'Germany', city: 'Regensburg',
+    component: 'Electronic Control Unit', capacity: 9000, capacityUtilization: 82,
+    onHandInventory: 32000, pipelineInventory: 12000, dailyConsumption: 1800,
+    leadTimeDays: 6, onTimeDelivery: 94, recoveryTimeDays: 16, altSourceActivationDays: 21,
+    financialImpactPerDay: 900000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2.1, reactionLeadTimeDays: 3 },
+  { id: 'T1-02', name: 'PolyWire Systems', tier: 'Tier-1', country: 'Poland', city: 'Wrocław',
+    component: 'Wiring Harness', capacity: 12000, capacityUtilization: 76,
+    onHandInventory: 42000, pipelineInventory: 14000, dailyConsumption: 1800,
+    leadTimeDays: 5, onTimeDelivery: 95, recoveryTimeDays: 12, altSourceActivationDays: 18,
+    financialImpactPerDay: 650000, alternativeSupplierIds: [], spof: false,
+    attdDays: 1.8, reactionLeadTimeDays: 2.5 },
+  { id: 'T1-03', name: 'FrictionTec Braking', tier: 'Tier-1', country: 'Germany', city: 'Koblenz',
+    component: 'Braking Components', capacity: 10000, capacityUtilization: 79,
+    onHandInventory: 38000, pipelineInventory: 11000, dailyConsumption: 1800,
+    leadTimeDays: 7, onTimeDelivery: 93, recoveryTimeDays: 18, altSourceActivationDays: 22,
+    financialImpactPerDay: 700000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2.4, reactionLeadTimeDays: 3.2 },
+  { id: 'T1-04', name: 'CellPack Energy', tier: 'Tier-1', country: 'Hungary', city: 'Győr',
+    component: 'Battery Cell', capacity: 7000, capacityUtilization: 91,
+    onHandInventory: 50000, pipelineInventory: 20000, dailyConsumption: 1750,
+    leadTimeDays: 9, onTimeDelivery: 90, recoveryTimeDays: 28, altSourceActivationDays: 35,
+    financialImpactPerDay: 1200000, alternativeSupplierIds: [], spof: true,
+    attdDays: 3.1, reactionLeadTimeDays: 4.5,
+    notes: 'Sole qualified battery-pack assembler for the current platform — single point of failure.' },
+  { id: 'T1-05', name: 'OptiSense ADAS', tier: 'Tier-1', country: 'Germany', city: 'Ulm',
+    component: 'Sensors', capacity: 8500, capacityUtilization: 84,
+    onHandInventory: 38000, pipelineInventory: 14000, dailyConsumption: 1800,
+    leadTimeDays: 8, onTimeDelivery: 92, recoveryTimeDays: 20, altSourceActivationDays: 24,
+    financialImpactPerDay: 780000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2.6, reactionLeadTimeDays: 3.4 },
+  { id: 'T1-06', name: 'FormaPlast Interior', tier: 'Tier-1', country: 'Czech Republic', city: 'Mladá Boleslav',
+    component: 'Plastics', capacity: 15000, capacityUtilization: 71,
+    onHandInventory: 60000, pipelineInventory: 18000, dailyConsumption: 1800,
+    leadTimeDays: 4, onTimeDelivery: 97, recoveryTimeDays: 9, altSourceActivationDays: 12,
+    financialImpactPerDay: 420000, alternativeSupplierIds: [], spof: false,
+    attdDays: 1.4, reactionLeadTimeDays: 2 },
+
+  // Tier-2
+  { id: 'T2-01', name: 'SilChip Packaging', tier: 'Tier-2', country: 'Taiwan', city: 'Hsinchu',
+    component: 'Semiconductor', capacity: 6000, capacityUtilization: 88,
+    onHandInventory: 58000, pipelineInventory: 24000, dailyConsumption: 1900,
+    leadTimeDays: 14, onTimeDelivery: 89, recoveryTimeDays: 30, altSourceActivationDays: 40,
+    financialImpactPerDay: 520000, alternativeSupplierIds: [], spof: false,
+    attdDays: 3.4, reactionLeadTimeDays: 5 },
+  { id: 'T2-02', name: 'CircuitForm PCB', tier: 'Tier-2', country: 'Germany', city: 'Nuremberg',
+    component: 'PCB Assembly', capacity: 9000, capacityUtilization: 74,
+    onHandInventory: 30000, pipelineInventory: 9000, dailyConsumption: 1800,
+    leadTimeDays: 6, onTimeDelivery: 95, recoveryTimeDays: 14, altSourceActivationDays: 16,
+    financialImpactPerDay: 340000, alternativeSupplierIds: ['T2-01'], spof: false,
+    attdDays: 1.9, reactionLeadTimeDays: 2.6 },
+  { id: 'T2-03', name: 'CopperLine Wiring', tier: 'Tier-2', country: 'Poland', city: 'Katowice',
+    component: 'Wiring Harness', capacity: 13000, capacityUtilization: 70,
+    onHandInventory: 46000, pipelineInventory: 15000, dailyConsumption: 1800,
+    leadTimeDays: 5, onTimeDelivery: 96, recoveryTimeDays: 10, altSourceActivationDays: 14,
+    financialImpactPerDay: 300000, alternativeSupplierIds: ['T2-04'], spof: false,
+    attdDays: 1.5, reactionLeadTimeDays: 2.1 },
+  { id: 'T2-04', name: 'ConnectPro Systems', tier: 'Tier-2', country: 'Slovakia', city: 'Nitra',
+    component: 'Connectors', capacity: 11000, capacityUtilization: 77,
+    onHandInventory: 70000, pipelineInventory: 30000, dailyConsumption: 4000,
+    leadTimeDays: 11, onTimeDelivery: 87, recoveryTimeDays: 25, altSourceActivationDays: 30,
+    financialImpactPerDay: 310000, alternativeSupplierIds: ['T2-03'], spof: false,
+    attdDays: 3.6, reactionLeadTimeDays: 4.8,
+    notes: 'Lead time trending up 30 days; monitored as an early-warning watch item.' },
+  { id: 'T2-05', name: 'CastBrake Components', tier: 'Tier-2', country: 'Germany', city: 'Herzogenaurach',
+    component: 'Braking Components', capacity: 10500, capacityUtilization: 80,
+    onHandInventory: 34000, pipelineInventory: 12000, dailyConsumption: 1800,
+    leadTimeDays: 8, onTimeDelivery: 93, recoveryTimeDays: 16, altSourceActivationDays: 20,
+    financialImpactPerDay: 380000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2.2, reactionLeadTimeDays: 3 },
+  { id: 'T2-06', name: 'FrictionMat Industries', tier: 'Tier-2', country: 'Italy', city: 'Turin',
+    component: 'Friction Material', capacity: 9500, capacityUtilization: 68,
+    onHandInventory: 32000, pipelineInventory: 10000, dailyConsumption: 1800,
+    leadTimeDays: 9, onTimeDelivery: 91, recoveryTimeDays: 18, altSourceActivationDays: 22,
+    financialImpactPerDay: 260000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2.5, reactionLeadTimeDays: 3.3 },
+  { id: 'T2-07', name: 'PowerCell Modules', tier: 'Tier-2', country: 'South Korea', city: 'Cheonan',
+    component: 'Battery Cell', capacity: 6500, capacityUtilization: 90,
+    onHandInventory: 58000, pipelineInventory: 22000, dailyConsumption: 1750,
+    leadTimeDays: 16, onTimeDelivery: 88, recoveryTimeDays: 32, altSourceActivationDays: 38,
+    financialImpactPerDay: 640000, alternativeSupplierIds: [], spof: true,
+    attdDays: 3.8, reactionLeadTimeDays: 5.2,
+    notes: 'Single-sourced cell chemistry qualified for current platform.' },
+  { id: 'T2-08', name: 'BattManage Electronics', tier: 'Tier-2', country: 'Germany', city: 'Leipzig',
+    component: 'Electronic Control Unit', capacity: 7500, capacityUtilization: 78,
+    onHandInventory: 28000, pipelineInventory: 11000, dailyConsumption: 1750,
+    leadTimeDays: 7, onTimeDelivery: 94, recoveryTimeDays: 15, altSourceActivationDays: 19,
+    financialImpactPerDay: 350000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2, reactionLeadTimeDays: 2.8 },
+  { id: 'T2-09', name: 'SenseChip Modules', tier: 'Tier-2', country: 'Taiwan', city: 'Taichung',
+    component: 'Sensors', capacity: 5800, capacityUtilization: 86,
+    onHandInventory: 40000, pipelineInventory: 14000, dailyConsumption: 2700,
+    leadTimeDays: 13, onTimeDelivery: 90, recoveryTimeDays: 18, altSourceActivationDays: 22,
+    financialImpactPerDay: 480000, alternativeSupplierIds: [], spof: false,
+    attdDays: 3.2, reactionLeadTimeDays: 4.4,
+    notes: 'Shares its wafer source (T3-07) with SilChip Packaging (T2-01) — hidden multi-tier dependency.' },
+  { id: 'T2-10', name: 'RadarVision Components', tier: 'Tier-2', country: 'Japan', city: 'Yokohama',
+    component: 'Sensors', capacity: 5200, capacityUtilization: 75,
+    onHandInventory: 42000, pipelineInventory: 16000, dailyConsumption: 1800,
+    leadTimeDays: 12, onTimeDelivery: 91, recoveryTimeDays: 22, altSourceActivationDays: 26,
+    financialImpactPerDay: 300000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2.9, reactionLeadTimeDays: 3.9 },
+  { id: 'T2-11', name: 'MotionDrive Motors', tier: 'Tier-2', country: 'China', city: 'Ningbo',
+    component: 'Electric Motor Components', capacity: 7200, capacityUtilization: 83,
+    onHandInventory: 44000, pipelineInventory: 18000, dailyConsumption: 1750,
+    leadTimeDays: 15, onTimeDelivery: 89, recoveryTimeDays: 24, altSourceActivationDays: 28,
+    financialImpactPerDay: 410000, alternativeSupplierIds: [], spof: false,
+    attdDays: 3, reactionLeadTimeDays: 4 },
+  { id: 'T2-12', name: 'MoldTech Plastics', tier: 'Tier-2', country: 'Czech Republic', city: 'Plzeň',
+    component: 'Plastics', capacity: 16000, capacityUtilization: 65,
+    onHandInventory: 64000, pipelineInventory: 20000, dailyConsumption: 1800,
+    leadTimeDays: 4, onTimeDelivery: 97, recoveryTimeDays: 8, altSourceActivationDays: 11,
+    financialImpactPerDay: 220000, alternativeSupplierIds: [], spof: false,
+    attdDays: 1.3, reactionLeadTimeDays: 1.9 },
+
+  // Tier-3
+  { id: 'T3-01', name: 'SteelCore Forging', tier: 'Tier-3', country: 'Germany', city: 'Duisburg',
+    component: 'Steel', capacity: 20000, capacityUtilization: 72,
+    onHandInventory: 80000, pipelineInventory: 25000, dailyConsumption: 1900,
+    leadTimeDays: 10, onTimeDelivery: 93, recoveryTimeDays: 14, altSourceActivationDays: 18,
+    financialImpactPerDay: 180000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2.2, reactionLeadTimeDays: 3 },
+  { id: 'T3-02', name: 'AlumTech Casting', tier: 'Tier-3', country: 'Germany', city: 'Essen',
+    component: 'Aluminium', capacity: 18000, capacityUtilization: 70,
+    onHandInventory: 72000, pipelineInventory: 22000, dailyConsumption: 1900,
+    leadTimeDays: 9, onTimeDelivery: 94, recoveryTimeDays: 13, altSourceActivationDays: 17,
+    financialImpactPerDay: 170000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2, reactionLeadTimeDays: 2.7 },
+  { id: 'T3-03', name: 'PureCopper Refining', tier: 'Tier-3', country: 'Chile', city: 'Antofagasta',
+    component: 'Wiring Harness', capacity: 15000, capacityUtilization: 68,
+    onHandInventory: 55000, pipelineInventory: 20000, dailyConsumption: 1800,
+    leadTimeDays: 21, onTimeDelivery: 90, recoveryTimeDays: 26, altSourceActivationDays: 32,
+    financialImpactPerDay: 150000, alternativeSupplierIds: [], spof: false,
+    attdDays: 3.5, reactionLeadTimeDays: 4.6 },
+  { id: 'T3-04', name: 'InsulPoly Materials', tier: 'Tier-3', country: 'Poland', city: 'Łódź',
+    component: 'Plastics', capacity: 22000, capacityUtilization: 63,
+    onHandInventory: 90000, pipelineInventory: 26000, dailyConsumption: 1800,
+    leadTimeDays: 6, onTimeDelivery: 96, recoveryTimeDays: 9, altSourceActivationDays: 12,
+    financialImpactPerDay: 95000, alternativeSupplierIds: [], spof: false,
+    attdDays: 1.4, reactionLeadTimeDays: 2 },
+  { id: 'T3-05', name: 'ConnectMold Components', tier: 'Tier-3', country: 'Slovakia', city: 'Košice',
+    component: 'Plastics', capacity: 14000, capacityUtilization: 66,
+    onHandInventory: 60000, pipelineInventory: 18000, dailyConsumption: 4000,
+    leadTimeDays: 8, onTimeDelivery: 92, recoveryTimeDays: 12, altSourceActivationDays: 15,
+    financialImpactPerDay: 120000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2.1, reactionLeadTimeDays: 2.9 },
+  { id: 'T3-06', name: 'PrecisionPin Metals', tier: 'Tier-3', country: 'Slovakia', city: 'Trnava',
+    component: 'Steel', capacity: 12000, capacityUtilization: 69,
+    onHandInventory: 64000, pipelineInventory: 26000, dailyConsumption: 4000,
+    leadTimeDays: 10, onTimeDelivery: 91, recoveryTimeDays: 15, altSourceActivationDays: 19,
+    financialImpactPerDay: 110000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2.3, reactionLeadTimeDays: 3.1 },
+  { id: 'T3-07', name: 'Apex Wafer Foundry', tier: 'Tier-3', country: 'Taiwan', city: 'Tainan',
+    component: 'Semiconductor', capacity: 8000, capacityUtilization: 94,
+    onHandInventory: 40000, pipelineInventory: 20000, dailyConsumption: 5000,
+    leadTimeDays: 45, onTimeDelivery: 82, recoveryTimeDays: 55, altSourceActivationDays: 50,
+    financialImpactPerDay: 180000, alternativeSupplierIds: [], spof: true,
+    attdDays: 5.5, reactionLeadTimeDays: 7,
+    notes: 'Sole qualified wafer foundry feeding BOTH SilChip Packaging (T2-01 → T1-01 ECU) and SenseChip Modules (T2-09 → T1-05 ADAS). Hidden Tier-3 single point of failure — the thesis validation scenario supplier.' },
+  { id: 'T3-08', name: 'SiliconSubstrate Corp', tier: 'Tier-3', country: 'South Korea', city: 'Icheon',
+    component: 'Semiconductor', capacity: 9000, capacityUtilization: 80,
+    onHandInventory: 45000, pipelineInventory: 15000, dailyConsumption: 1800,
+    leadTimeDays: 20, onTimeDelivery: 89, recoveryTimeDays: 24, altSourceActivationDays: 30,
+    financialImpactPerDay: 140000, alternativeSupplierIds: [], spof: false,
+    attdDays: 3.3, reactionLeadTimeDays: 4.5 },
+  { id: 'T3-09', name: 'ResinBoard Materials', tier: 'Tier-3', country: 'Germany', city: 'Augsburg',
+    component: 'Plastics', capacity: 16000, capacityUtilization: 61,
+    onHandInventory: 70000, pipelineInventory: 20000, dailyConsumption: 1800,
+    leadTimeDays: 5, onTimeDelivery: 97, recoveryTimeDays: 8, altSourceActivationDays: 10,
+    financialImpactPerDay: 80000, alternativeSupplierIds: [], spof: false,
+    attdDays: 1.2, reactionLeadTimeDays: 1.7 },
+  { id: 'T3-10', name: 'CastIron Works', tier: 'Tier-3', country: 'Germany', city: 'Duisburg',
+    component: 'Steel', capacity: 17000, capacityUtilization: 74,
+    onHandInventory: 68000, pipelineInventory: 21000, dailyConsumption: 1800,
+    leadTimeDays: 11, onTimeDelivery: 92, recoveryTimeDays: 16, altSourceActivationDays: 20,
+    financialImpactPerDay: 130000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2.4, reactionLeadTimeDays: 3.2 },
+  { id: 'T3-11', name: 'FricPowder Chemicals', tier: 'Tier-3', country: 'Italy', city: 'Milan',
+    component: 'Friction Material', capacity: 11000, capacityUtilization: 64,
+    onHandInventory: 44000, pipelineInventory: 14000, dailyConsumption: 1800,
+    leadTimeDays: 9, onTimeDelivery: 93, recoveryTimeDays: 14, altSourceActivationDays: 17,
+    financialImpactPerDay: 90000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2, reactionLeadTimeDays: 2.6 },
+  { id: 'T3-12', name: 'CarbonFiber Composites', tier: 'Tier-3', country: 'Italy', city: 'Bergamo',
+    component: 'Plastics', capacity: 9000, capacityUtilization: 60,
+    onHandInventory: 40000, pipelineInventory: 12000, dailyConsumption: 1800,
+    leadTimeDays: 8, onTimeDelivery: 94, recoveryTimeDays: 11, altSourceActivationDays: 14,
+    financialImpactPerDay: 75000, alternativeSupplierIds: [], spof: false,
+    attdDays: 1.9, reactionLeadTimeDays: 2.4 },
+  { id: 'T3-13', name: 'LithiumSource Mining', tier: 'Tier-3', country: 'Australia', city: 'Perth',
+    component: 'Battery Cell', capacity: 13000, capacityUtilization: 77,
+    onHandInventory: 52000, pipelineInventory: 20000, dailyConsumption: 1750,
+    leadTimeDays: 24, onTimeDelivery: 87, recoveryTimeDays: 28, altSourceActivationDays: 34,
+    financialImpactPerDay: 160000, alternativeSupplierIds: [], spof: false,
+    attdDays: 4, reactionLeadTimeDays: 5.5 },
+  { id: 'T3-14', name: 'CathodeChem Materials', tier: 'Tier-3', country: 'South Korea', city: 'Ulsan',
+    component: 'Battery Cell', capacity: 11000, capacityUtilization: 82,
+    onHandInventory: 42000, pipelineInventory: 16000, dailyConsumption: 1750,
+    leadTimeDays: 18, onTimeDelivery: 88, recoveryTimeDays: 22, altSourceActivationDays: 27,
+    financialImpactPerDay: 150000, alternativeSupplierIds: [], spof: false,
+    attdDays: 3.4, reactionLeadTimeDays: 4.6 },
+  { id: 'T3-15', name: 'TerraRare Magnetics', tier: 'Tier-3', country: 'China', city: 'Baotou',
+    component: 'Rare-Earth Materials', capacity: 5000, capacityUtilization: 91,
+    onHandInventory: 18000, pipelineInventory: 6000, dailyConsumption: 1200,
+    leadTimeDays: 38, onTimeDelivery: 81, recoveryTimeDays: 50, altSourceActivationDays: 45,
+    financialImpactPerDay: 95000, alternativeSupplierIds: [], spof: true,
+    attdDays: 5.2, reactionLeadTimeDays: 6.8,
+    notes: 'Sole qualified rare-earth magnet source feeding BOTH RadarVision Components (T2-10 → T1-05 ADAS) and MotionDrive Motors (T2-11 → T1-04 Battery). Hidden Tier-3 single point of failure, concentrated in one export region.' },
+  { id: 'T3-16', name: 'PowerSemi Devices', tier: 'Tier-3', country: 'Germany', city: 'Dresden',
+    component: 'Semiconductor', capacity: 7000, capacityUtilization: 79,
+    onHandInventory: 48000, pipelineInventory: 18000, dailyConsumption: 1750,
+    leadTimeDays: 22, onTimeDelivery: 90, recoveryTimeDays: 26, altSourceActivationDays: 31,
+    financialImpactPerDay: 130000, alternativeSupplierIds: [], spof: false,
+    attdDays: 3.6, reactionLeadTimeDays: 4.9 },
+  { id: 'T3-17', name: 'CircuitFoil Materials', tier: 'Tier-3', country: 'Japan', city: 'Osaka',
+    component: 'PCB Assembly', capacity: 8500, capacityUtilization: 66,
+    onHandInventory: 34000, pipelineInventory: 11000, dailyConsumption: 1750,
+    leadTimeDays: 16, onTimeDelivery: 91, recoveryTimeDays: 18, altSourceActivationDays: 22,
+    financialImpactPerDay: 85000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2.8, reactionLeadTimeDays: 3.7 },
+  { id: 'T3-18', name: 'OpticalLens Systems', tier: 'Tier-3', country: 'Japan', city: 'Nagoya',
+    component: 'Sensors', capacity: 6000, capacityUtilization: 72,
+    onHandInventory: 34000, pipelineInventory: 13000, dailyConsumption: 1800,
+    leadTimeDays: 14, onTimeDelivery: 92, recoveryTimeDays: 17, altSourceActivationDays: 21,
+    financialImpactPerDay: 95000, alternativeSupplierIds: [], spof: false,
+    attdDays: 2.7, reactionLeadTimeDays: 3.6 },
+  { id: 'T3-19', name: 'PolymerResin Chemicals', tier: 'Tier-3', country: 'Czech Republic', city: 'Brno',
+    component: 'Plastics', capacity: 19000, capacityUtilization: 58,
+    onHandInventory: 82000, pipelineInventory: 24000, dailyConsumption: 1800,
+    leadTimeDays: 5, onTimeDelivery: 97, recoveryTimeDays: 7, altSourceActivationDays: 9,
+    financialImpactPerDay: 65000, alternativeSupplierIds: [], spof: false,
+    attdDays: 1.1, reactionLeadTimeDays: 1.6 },
+  { id: 'T3-20', name: 'ColorMasterbatch Co', tier: 'Tier-3', country: 'Poland', city: 'Poznań',
+    component: 'Plastics', capacity: 10000, capacityUtilization: 55,
+    onHandInventory: 46000, pipelineInventory: 13000, dailyConsumption: 1800,
+    leadTimeDays: 6, onTimeDelivery: 98, recoveryTimeDays: 6, altSourceActivationDays: 8,
+    financialImpactPerDay: 40000, alternativeSupplierIds: [], spof: false,
+    attdDays: 1, reactionLeadTimeDays: 1.4 },
+]
+
+export const rawEdges: SupplyEdge[] = [
+  // Tier-1 -> OEM
+  { id: 'e-t1-oem-1', source: 'T1-01', target: 'OEM-1', component: 'Electronic Control Unit', criticality: 'high' },
+  { id: 'e-t1-oem-2', source: 'T1-02', target: 'OEM-1', component: 'Wiring Harness', criticality: 'high' },
+  { id: 'e-t1-oem-3', source: 'T1-03', target: 'OEM-1', component: 'Braking Components', criticality: 'high' },
+  { id: 'e-t1-oem-4', source: 'T1-04', target: 'OEM-1', component: 'Battery Cell', criticality: 'high' },
+  { id: 'e-t1-oem-5', source: 'T1-05', target: 'OEM-1', component: 'Sensors', criticality: 'high' },
+  { id: 'e-t1-oem-6', source: 'T1-06', target: 'OEM-1', component: 'Plastics', criticality: 'medium' },
+
+  // Tier-2 -> Tier-1
+  { id: 'e-t2-t1-1', source: 'T2-01', target: 'T1-01', component: 'Semiconductor', criticality: 'high' },
+  { id: 'e-t2-t1-2', source: 'T2-02', target: 'T1-01', component: 'PCB Assembly', criticality: 'medium' },
+  { id: 'e-t2-t1-3', source: 'T2-03', target: 'T1-02', component: 'Wiring Harness', criticality: 'high' },
+  { id: 'e-t2-t1-4', source: 'T2-04', target: 'T1-02', component: 'Connectors', criticality: 'medium' },
+  { id: 'e-t2-t1-5', source: 'T2-05', target: 'T1-03', component: 'Braking Components', criticality: 'high' },
+  { id: 'e-t2-t1-6', source: 'T2-06', target: 'T1-03', component: 'Friction Material', criticality: 'medium' },
+  { id: 'e-t2-t1-7', source: 'T2-07', target: 'T1-04', component: 'Battery Cell', criticality: 'high' },
+  { id: 'e-t2-t1-8', source: 'T2-08', target: 'T1-04', component: 'Electronic Control Unit', criticality: 'medium' },
+  { id: 'e-t2-t1-9', source: 'T2-09', target: 'T1-05', component: 'Sensors', criticality: 'high' },
+  { id: 'e-t2-t1-10', source: 'T2-10', target: 'T1-05', component: 'Sensors', criticality: 'medium' },
+  { id: 'e-t2-t1-11', source: 'T2-11', target: 'T1-04', component: 'Electric Motor Components', criticality: 'high' },
+  { id: 'e-t2-t1-12', source: 'T2-12', target: 'T1-06', component: 'Plastics', criticality: 'medium' },
+
+  // Tier-3 -> Tier-2
+  { id: 'e-t3-t2-1', source: 'T3-01', target: 'T2-05', component: 'Steel', criticality: 'medium' },
+  { id: 'e-t3-t2-2', source: 'T3-02', target: 'T2-05', component: 'Aluminium', criticality: 'medium' },
+  { id: 'e-t3-t2-3', source: 'T3-03', target: 'T2-03', component: 'Wiring Harness', criticality: 'high' },
+  { id: 'e-t3-t2-4', source: 'T3-04', target: 'T2-03', component: 'Plastics', criticality: 'low' },
+  { id: 'e-t3-t2-5', source: 'T3-05', target: 'T2-04', component: 'Plastics', criticality: 'medium' },
+  { id: 'e-t3-t2-6', source: 'T3-06', target: 'T2-04', component: 'Steel', criticality: 'medium' },
+  { id: 'e-t3-t2-7a', source: 'T3-07', target: 'T2-01', component: 'Semiconductor', criticality: 'high' },
+  { id: 'e-t3-t2-7b', source: 'T3-07', target: 'T2-09', component: 'Semiconductor', criticality: 'high' },
+  { id: 'e-t3-t2-8', source: 'T3-08', target: 'T2-02', component: 'Semiconductor', criticality: 'medium' },
+  { id: 'e-t3-t2-9', source: 'T3-09', target: 'T2-02', component: 'Plastics', criticality: 'low' },
+  { id: 'e-t3-t2-10', source: 'T3-10', target: 'T2-05', component: 'Steel', criticality: 'medium' },
+  { id: 'e-t3-t2-11', source: 'T3-11', target: 'T2-06', component: 'Friction Material', criticality: 'medium' },
+  { id: 'e-t3-t2-12', source: 'T3-12', target: 'T2-06', component: 'Plastics', criticality: 'low' },
+  { id: 'e-t3-t2-13', source: 'T3-13', target: 'T2-07', component: 'Battery Cell', criticality: 'high' },
+  { id: 'e-t3-t2-14', source: 'T3-14', target: 'T2-07', component: 'Battery Cell', criticality: 'medium' },
+  { id: 'e-t3-t2-15a', source: 'T3-15', target: 'T2-10', component: 'Rare-Earth Materials', criticality: 'high' },
+  { id: 'e-t3-t2-15b', source: 'T3-15', target: 'T2-11', component: 'Rare-Earth Materials', criticality: 'high' },
+  { id: 'e-t3-t2-16', source: 'T3-16', target: 'T2-08', component: 'Semiconductor', criticality: 'medium' },
+  { id: 'e-t3-t2-17', source: 'T3-17', target: 'T2-08', component: 'PCB Assembly', criticality: 'low' },
+  { id: 'e-t3-t2-18', source: 'T3-18', target: 'T2-10', component: 'Sensors', criticality: 'medium' },
+  { id: 'e-t3-t2-19', source: 'T3-19', target: 'T2-12', component: 'Plastics', criticality: 'low' },
+  { id: 'e-t3-t2-20', source: 'T3-20', target: 'T2-12', component: 'Plastics', criticality: 'low' },
+]
+
+export const suppliers: SupplierWithKpis[] = rawSuppliers.map((s) => ({ ...s, ...deriveKpis(s) }))
+export const suppliersById: Record<string, SupplierWithKpis> = Object.fromEntries(suppliers.map((s) => [s.id, s]))
+export const edges: SupplyEdge[] = rawEdges
+
+export const HIDDEN_SPOF_IDS = ['T3-07', 'T3-15']
+
+export function upstreamOf(id: string): SupplyEdge[] {
+  return edges.filter((e) => e.target === id)
+}
+export function downstreamOf(id: string): SupplyEdge[] {
+  return edges.filter((e) => e.source === id)
+}
+
+/** All nodes reachable downstream (toward OEM) from a given supplier id, BFS. */
+export function downstreamClosure(id: string): string[] {
+  const visited = new Set<string>()
+  const queue = [id]
+  while (queue.length) {
+    const cur = queue.shift()!
+    for (const e of downstreamOf(cur)) {
+      if (!visited.has(e.target)) {
+        visited.add(e.target)
+        queue.push(e.target)
+      }
+    }
+  }
+  return Array.from(visited)
+}
+
+/** All nodes reachable upstream (toward Tier-3) from a given supplier id, BFS. */
+export function upstreamClosure(id: string): string[] {
+  const visited = new Set<string>()
+  const queue = [id]
+  while (queue.length) {
+    const cur = queue.shift()!
+    for (const e of upstreamOf(cur)) {
+      if (!visited.has(e.source)) {
+        visited.add(e.source)
+        queue.push(e.source)
+      }
+    }
+  }
+  return Array.from(visited)
+}
