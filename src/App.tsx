@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import ExecutiveOverview from './pages/ExecutiveOverview'
 import SupplyNetwork from './pages/SupplyNetwork'
@@ -11,7 +11,7 @@ import Methodology from './pages/Methodology'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<ExecutiveOverview />} />
@@ -24,6 +24,6 @@ export default function App() {
           <Route path="/methodology" element={<Methodology />} />
         </Route>
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
