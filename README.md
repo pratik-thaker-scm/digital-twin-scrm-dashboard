@@ -33,7 +33,7 @@ The resilience rule driving the whole app: **TTS ≥ TTR is resilient; TTS < TTR
 
 ## Tech stack
 
-React 19 + TypeScript + Vite, React Router, Recharts, React Flow, Tailwind CSS v4, Lucide icons. No backend — all business logic (KPI formulas, simulation engine, recommendation engine) lives in `src/calculations` and `src/simulation`, separate from the UI.
+React 19 + TypeScript + Vite, React Router, Recharts, React Flow, Tailwind CSS v4, Lucide icons. No backend - all business logic (KPI formulas, simulation engine, recommendation engine) lives in `src/calculations` and `src/simulation`, separate from the UI.
 
 ## Running locally
 
