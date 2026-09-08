@@ -2,19 +2,19 @@
 
 **Live demo:** https://pratik-thaker-scm.github.io/digital-twin-scrm-dashboard/
 
-A conceptual, interactive Digital Twin Supply Chain Resilience Dashboard — the practical prototype implementation of the framework described in Kapitel 5 of the thesis *"Steigerung der Resilienz und Risikominimierung im Supply Chain Management der Automobilindustrie durch den Einsatz digitaler Zwillinge."*
+A conceptual, interactive Digital Twin Supply Chain Resilience Dashboard - the practical prototype implementation of the framework described in Kapitel 5 of the thesis *"Steigerung der Resilienz und Risikominimierung im Supply Chain Management der Automobilindustrie durch den Einsatz digitaler Zwillinge."*
 
-> **All data in this application is simulated.** It demonstrates the thesis's conceptual framework — it is not connected to a real OEM, ERP system, or live supplier feed. See the in-app Methodology page for the full prototype-scope disclosure.
+> **All data in this application is simulated.** It demonstrates the thesis's conceptual framework - it is not connected to a real OEM, ERP system, or live supplier feed. See the in-app Methodology page for the full prototype-scope disclosure.
 
 ## What it does
 
-A fictional automotive OEM ("Vantoria Motors AG") is modeled with a 38-supplier, three-tier network (Tier-1, Tier-2, Tier-3), including two deliberately hidden Tier-3 single points of failure that each feed two independent upstream paths — demonstrating the thesis's core argument that OEMs typically lose visibility beyond Tier-1.
+A fictional automotive OEM ("Vantoria Motors AG") is modeled with a 38-supplier, three-tier network (Tier-1, Tier-2, Tier-3), including two deliberately hidden Tier-3 single points of failure that each feed two independent upstream paths, demonstrating the thesis's core argument that OEMs typically lose visibility beyond Tier-1.
 
 The dashboard is built around three resilience KPIs from the thesis:
 
-- **TTS (Time-to-Survive)** — how long the network can run on current inventory before a supply gap hits
-- **TTR (Time-to-Recovery)** — how long it takes to recover from a disruption
-- **REI (Risk Exposure Index)** — TTR × financial impact per day, the euro cost of that risk
+- **TTS (Time-to-Survive)** - how long the network can run on current inventory before a supply gap hits
+- **TTR (Time-to-Recovery)** - how long it takes to recover from a disruption
+- **REI (Risk Exposure Index)** - TTR × financial impact per day, the euro cost of that risk
 
 The resilience rule driving the whole app: **TTS ≥ TTR is resilient; TTS < TTR is critical.**
 
