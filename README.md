@@ -1,4 +1,4 @@
-# SCRM Digital Twin — Resilience Command Center
+# SCRM Digital Twin - Resilience Command Center
 
 **Live demo:** https://pratik-thaker-scm.github.io/digital-twin-scrm-dashboard/
 
